@@ -16,9 +16,9 @@
    - [Data Models](#data-models)
    - [Database Layer (EF Core)](#database-layer-ef-core)
 5. [Frontend Deep-Dive](#-frontend-deep-dive)
-   - [index.html — Page Structure & All UI Fields](#indexhtml--page-structure--all-ui-fields)
-   - [app.js — Client Logic](#appjs--client-logic)
-   - [site.css — Visual Design System](#sitecss--visual-design-system)
+   - [index.html — Layout & Component Structure](#indexhtml--layout--component-structure)
+   - [app.js — Client Logic & Event Architecture](#appjs--client-logic--event-architecture)
+   - [site.css — Design Tokens & Theming System](#sitecss--design-tokens--theming-system)
 6. [Data Flow — End-to-End Request Lifecycle](#-data-flow--end-to-end-request-lifecycle)
 7. [Database Schema](#-database-schema)
 8. [API Reference](#-api-reference)
@@ -36,11 +36,12 @@
 
 | Capability | Detail |
 |---|---|
-| Accepts feedback | Via a browser text form (up to 2,000 characters) |
-| Classifies sentiment | Returns **Positive**, **Negative**, or **Neutral** |
+| Accepts feedback | Via a pinned bottom composer dock (auto-expanding up to 2,000 characters) |
+| Classifies sentiment | Returns **Positive**, **Negative**, or **Neutral** with confidence polarity meter |
 | Uses hybrid intelligence | Lexical rules + negation handling + ML.NET fallback |
-| Persists results | Stores feedback text, label, and UTC timestamp in SQL Server |
-| Delivers a full UI | Themed, responsive, single-page-like experience with no framework |
+| Diagnostic insights | Extracts detected signal words (cues) in real-time |
+| Persists results | Stores feedback text, label, and UTC timestamp in SQL Server (`SentimentDb.Feedbacks`) |
+| Delivers a modern UI | Linear/ChatGPT-style workspace with stream feed, session history, and true black dark mode |
 | Developer-friendly | Swagger/OpenAPI endpoint available in development mode |
 
 ---
@@ -342,195 +343,150 @@ The frontend is served as **static files** from `wwwroot/` by ASP.NET Core's `Us
 
 ---
 
-### `index.html` — Page Structure & UI Layout
+## 🖥 Frontend Deep-Dive
 
-The interface features an **un-slopped, production-grade workspace** inspired by modern developer and telemetry tools (Linear / Raycast / ChatGPT):
+The frontend is served as static files from `wwwroot/` by ASP.NET Core's `UseStaticFiles` middleware. It is designed as a **modern, developer-focused workspace** inspired by ChatGPT and Linear:
 
-#### Layout Components
+```
+┌─────────────────┬────────────────────────────────────────────────────────┐
+│     SIDEBAR     │                    WORKSPACE                           │
+│                 │  [☰] Feedback Classification Workspace   ● API Active  │
+│  [S] Studio [+] │  ────────────────────────────────────────────────────  │
+│  ────────────── │                                                        │
+│  ENGINE STATUS  │                 CENTRAL STREAM FEED                    │
+│  SDCA + Lexicon │                                                        │
+│  SentimentDb    │    [Empty State Benchmark Cards OR Messages Stream]   │
+│  [2 pos 1 neu]  │                                                        │
+│  ────────────── │    User Bubble: "The migration was brilliant..."   ──► │
+│  RECENT HISTORY │                                                        │
+│  ● Praise... [×]│    ◄── [S] ┌─── Classification Telemetry Card ───────┐ │
+│  ● Defect... [×]│            │  POSITIVE                    14:32 UTC  │ │
+│  ────────────── │            │  Polarity Metric: 88%                   │ │
+│  [Clear History]│            │  Diagnostic: Favorable satisfaction     │ │
+│  ────────────── │            │  Cues: [migration] [brilliant]          │ │
+│  [Light|Dark|Auto│           │  [Copy Text]  [Copy JSON]  Persisted DB │ │
+│                 │            └─────────────────────────────────────────┘ │
+└─────────────────┴────────────────────────────────────────────────────────┤
+                  │  ┌── Composer Dock ──────────────────────────────────┐ │
+                  │  │ Type or paste feedback...                         │ │
+                  │  │ 0 / 2,000 • ↵ Enter to analyze          [Analyze] │ │
+                  │  └───────────────────────────────────────────────────┘ │
+                  │  Persisted asynchronously to SQL Server (SentimentDb)  │
+                  └────────────────────────────────────────────────────────┘
+```
+
+---
+
+### `index.html` — Layout & Component Structure
+
+#### 1. Collapsible Sidebar (`<aside class="sidebar" id="sidebar">`)
 
 | Component | Selector / ID | Purpose |
 |---|---|---|
-| **Collapsible Sidebar** | `#sidebar` | Houses brand header, engine telemetry, live sentiment counter, session history, and theme switcher |
-| **Telemetry Card** | `.telemetry-card` | Displays active engine status (`SDCA + Lexicon`), DB binding (`SentimentDb`), and live counters for positive/neutral/negative classifications |
-| **Analysis History** | `#history-list` | Persistent record of past analyses with status indicators, quick re-load on click, and individual deletion |
-| **Theme Switcher** | `.theme-switcher` | Instant toggle between Light, Dark, and System modes |
-| **Workspace Header** | `.topbar` | Sidebar toggle button, workspace title, and live API status indicator |
-| **Central Feed** | `#feed-container` | Houses the benchmark sample prompt cards in empty state, and the conversation stream once analysis begins |
-| **Sample Benchmark Cards** | `.sample-card` | Pre-configured realistic evaluation samples (Favorable Signal, Defect/Attrition, Factual/Logistics) |
-| **Message Stream** | `#stream` | Chronological cluster of user input bubbles and structured diagnostic cards |
-| **Classification Card** | `.classification-card` | Displays bold sentiment badge, polarity meter percentage bar, detailed analytical explanation, detected lexical cue pills, UTC timestamp, and action buttons ("Copy Text", "JSON") |
-| **Bottom Composer Dock** | `.dock` | Pinned multi-line auto-expanding textarea, live character counter with warning thresholds, keyboard shortcut hints, and submit action |
-| **Toast System** | `#toast` | Non-intrusive floating feedback notifications for user actions |
+| **Brand Identifier** | `.brand` | "Sentiment Studio" logo with purple gradient badge |
+| **New Analysis Action** | `#new-analysis-btn` | Clears current feed and focuses composer (`Ctrl+K`) |
+| **Telemetry Card** | `.telemetry-card` | Displays active engine (`SDCA + Lexicon`) and target DB (`SentimentDb`) |
+| **Live Statistics** | `.telemetry-stats` | Dynamic counters (`#count-pos`, `#count-neu`, `#count-neg`) for session evaluations |
+| **Analysis History** | `#history-list` | Clickable log of previous analyses with deletion button per item |
+| **Clear History Action** | `#clear-history-btn` | Wipes the stored session history from memory and `localStorage` |
+| **Theme Switcher** | `.theme-switcher` | 3-way toggle buttons for **Light**, **Dark** *(default active)*, and **Auto** |
 
-> All settings are saved to `localStorage` under the key `sentiment-studio-preferences` as a JSON object and restored on every page load.
+#### 2. Workspace Header (`<header class="topbar">`)
+
+| Element | ID / Class | Purpose |
+|---|---|---|
+| **Sidebar Toggle** | `#sidebar-toggle-btn` | Collapses or expands the left sidebar |
+| **Workspace Title** | `.topbar-title` | "Feedback Classification Workspace" label |
+| **API Status Dot** | `.live-dot` | Pulsating emerald dot confirming active backend connectivity |
+
+#### 3. Central Stream Feed (`<div class="feed-container" id="feed-container">`)
+
+**Empty State View (`#empty-state`):**
+Shown when no text has been analyzed in the current session.
+- **Title & Badge**: "Production Classification" / "Evaluate Customer Sentiment".
+- **Benchmark Sample Cards**: One-click test scenarios to quickly demonstrate the engine:
+  - *Favorable Signal*: Positive review with speed and satisfaction cues.
+  - *Defect & Attrition*: Negative feedback with checkout crash and support neglect cues.
+  - *Factual / Logistics*: Neutral message with shipping and invoice numbers.
+
+**Active Conversation Stream (`#stream`):**
+- **User Message Row** (`.user-row`): Clean right-aligned bubble containing the submitted feedback.
+- **Loading Skeleton** (`.loading-row`): Shimmering skeleton loader rendered while the API request is processing.
+- **Classification Card** (`.classification-card`):
+  - **Sentiment Badge**: High-contrast state pill (`Positive`, `Negative`, or `Neutral`).
+  - **Polarity Meter**: Dynamic percentage bar visualizing emotional polarity.
+  - **Diagnostic Summary**: Clear, professional telemetry description of the detected tone.
+  - **Detected Cues**: Extracted keywords highlighted as individual signal tags (e.g. `brilliant`, `seamless`, `failed`).
+  - **Action Toolbar**: "Copy Text" button, "JSON" telemetry export button, and database persistence confirmation.
+
+#### 4. Pinned Bottom Dock (`<footer class="dock">`)
+
+| Element | ID / Class | Purpose |
+|---|---|---|
+| **Form Container** | `#composer-form` | Handles submission, keydown interception, and layout constraints |
+| **Textarea** | `#composer-input` | Multi-line auto-expanding input (grows up to 190px, `maxlength="2000"`) |
+| **Character Counter** | `#char-meter` | Real-time `0 / 2,000` counter; shifts to warning color past 1,850 chars |
+| **Keyboard Hints** | `.shortcut-hint` | Displays `↵ Enter to analyze • ⇧↵ newline` |
+| **Submit Button** | `#submit-btn` | Triggers POST request; disabled when empty, displays spinner state on submit |
+| **Persistence Footnote** | `.dock-disclaimer` | Notes that submissions are stored in `SentimentDb.Feedbacks` |
+| **Toast System** | `#toast` | Floating notification acknowledging copy or reset actions |
 
 ---
 
-#### `<main class="page-shell">` — Main Content
+### `app.js` — Client Logic & Event Architecture
 
-**Hero Section** (`.hero`)
+#### Key Modules & Functions
 
-| Element | Content |
+| Function / Module | Purpose |
 |---|---|
-| `.eyebrow` | "FEEDBACK INTELLIGENCE" (decorative label) |
-| `<h1>` | "Understand how your customers feel." |
-| `.hero-copy` | Descriptive subtitle about the tool's purpose |
+| `LEXICON` | Client-side mirrored vocabulary sets (`positive`, `negative`, `factual`, `negation`) used to extract and highlight signal words in real time |
+| `extractLexicalCues(text)` | Tokenizes input and detects matching dictionary cues for the diagnostic tags |
+| `getSentimentProfile(sentiment)` | Returns color tokens, polarity percentage, badge styles, and diagnostic summaries |
+| `initTheme()` & `setTheme(theme)` | Enforces default **Dark Theme** (`sentiment_studio_theme_v2`), sets `data-theme` on `<body>`, and syncs button states |
+| `recordAnalysis(text, sentiment)` | Prepends entry to `analysisHistory`, caps at 50 records, and persists to `localStorage` |
+| `renderHistoryList()` | Renders the sidebar history with color-coded status dots and delete listeners |
+| `appendUserMessage(text)` | Adds user bubble to stream and scrolls feed smoothly to bottom |
+| `appendLoadingIndicator()` | Renders the animated CSS shimmer skeleton while awaiting API response |
+| `renderResultCard(...)` | Replaces the shimmer skeleton with the full diagnostic classification card |
+| `updateComposer()` | Auto-sizes textarea height, updates character count, and toggles submit button availability |
+| `showToast(message)` | Displays a 2.4-second floating status pill |
+
+#### Keyboard Shortcuts
+
+- **Enter** (without Shift): Submits feedback for classification.
+- **Shift + Enter**: Inserts a new line in the textarea without submitting.
+- **Ctrl + K** (or **Cmd + K**): Resets workspace and initiates a new analysis session.
+- **Escape**: Clears the current text from the composer.
 
 ---
 
-**Workspace Section** (`.workspace`) — The Two-Panel Analyzer
+### `site.css` — Design Tokens & Theming System
 
-**Panel 1 — Input Panel** (`.input-panel`)
+The stylesheet implements a dual-theme architecture with **true neutral black dark mode** (zero purple tint):
 
-| Element | ID / Attribute | Purpose |
-|---|---|---|
-| Panel kicker | `.panel-kicker` | "01 / WRITE YOUR FEEDBACK" |
-| Panel heading `<h2>` | — | "What would you like to analyze?" |
-| Sparkle icon | `.sparkle` | Decorative `✦` symbol |
-| `<form id="feedback-form">` | `#feedback-form` | Wraps the input and submit button |
-| Visually-hidden `<label>` | `for="feedback-text"` | Accessible label (screen readers only) |
-| `<textarea>` | `#feedback-text` | **Main input field** — `maxlength="2000"`, `required`, placeholder text, resizable vertically |
-| Character counter | `#character-count` | Live count: `0 / 2,000` (updates on `input` event) |
-| Submit button | `.analyze-button` | "Analyze sentiment →" — disabled + shows "Analyzing..." while request is pending |
-| Button label | `#button-label` | Text inside button (toggled by JS) |
-| Button arrow | `.button-arrow` | `→` arrow badge inside button |
-| Privacy note | `.privacy-note` | "Your feedback is analyzed securely and stored for insights." |
+#### Design Token Reference
 
----
-
-**Panel 2 — Result Panel** (`.result-panel`, `#result-panel`, `aria-live="polite"`)
-
-Three mutually exclusive states, controlled by JS `hidden` attribute:
-
-**State A — Empty (default):**
-
-| Element | ID | Content |
-|---|---|---|
-| Empty orbit | `.empty-orbit` | Animated `✦` icon in a dashed circle |
-| Empty text | — | "Share a thought to reveal its sentiment." |
-
-**State B — Analysis Result** (`#analysis-result`):
-
-| Element | ID | Purpose |
-|---|---|---|
-| Panel kicker | `.panel-kicker` | "02 / YOUR RESULT" |
-| Result title | `#result-title` | e.g. "That feels positive." |
-| Result icon | `#result-icon` | `↗` (Positive), `↘` (Negative), `→` (Neutral), `◎` (default) |
-| Sentiment label | `#sentiment-label` | Large text: "Positive" / "Negative" / "Neutral" (color-coded) |
-| Sentiment meter | `.sentiment-meter` → `#sentiment-meter-fill` | Horizontal progress bar — 88% green (Positive), 56% amber (Neutral), 28% red (Negative) |
-| Result description | `#result-description` | Human-readable interpretation of the sentiment |
-| Reset button | `#reset-button` | "Analyze another ↗" — clears form and resets UI |
-
-**State C — Error** (`#error-message`, `role="alert"`):
-
-| Element | ID | Purpose |
-|---|---|---|
-| Error message | `#error-message` | Shows API or network error text; announced to screen readers via `role="alert"` |
-
----
-
-**Trust Row** (`.trust-row`) — Feature Benefits Strip
-
-| Icon | Heading | Subtext |
-|---|---|---|
-| `◒` | Clear signals | "Instantly understand the tone" |
-| `⌁` | Built for speed | "Results in just a moment" |
-| `✧` | Simple by design | "No analysis expertise needed" |
-
----
-
-#### `<footer class="site-footer">`
-
-Displays: `SENTIMENT STUDIO • FEEDBACK, MADE CLEAR`
-
----
-
-### `app.js` — Client Logic
-
-#### DOM References
-
-All interactive elements are captured at the top of the file (form, textarea, buttons, panels, settings controls, etc.).
-
-#### User Preferences System
-
-| Function | Purpose |
-|---|---|
-| `getPreferences()` | Reads & parses `localStorage["sentiment-studio-preferences"]`; falls back to defaults on error |
-| `savePreferences(prefs)` | Serializes preferences to `localStorage` |
-| `applyPreferences(prefs)` | Sets CSS custom properties, body classes, and control states to match saved preferences |
-| `updatePreference(name, value)` | Updates one preference, saves, and applies |
-
-**Default preferences object:**
-```js
-{ theme: 'light', backgroundColor: '#f7f8fc', fontSize: '100', density: 'comfortable' }
-```
-
-#### Sentiment Result Styles
-
-Three visual profiles applied when a result is shown:
-
-| Sentiment | Title | Icon | Description | Color | Meter Width |
-|---|---|---|---|---|---|
-| Positive | "That feels positive." | `↗` | "encouraging and optimistic tone" | `#15956d` (green) | 88% |
-| Negative | "That feels negative." | `↘` | "opportunity to listen, improve, and follow up" | `#e15f52` (coral) | 28% |
-| Neutral | "That feels neutral." | `→` | "balanced or factual without a strong emotional signal" | `#c28a24` (amber) | 56% |
-
-#### Form Submission Flow
-
-```
-User clicks "Analyze sentiment"
-  → preventDefault() (no page reload)
-  → Disable button, label = "Analyzing..."
-  → fetch POST /api/Feedback/analyze { feedbackText }
-  → if !response.ok  → showError(message)
-  → else             → showResult(result.sentiment)
-  → finally: re-enable button, restore label
-```
-
-#### Event Listeners Summary
-
-| Event | Element | Action |
-|---|---|---|
-| `submit` | `#feedback-form` | Calls API, shows result |
-| `input` | `#feedback-text` | Updates character counter |
-| `click` | `#reset-button` | Clears textarea, resets UI to empty state |
-| `click` | `#settings-button` | Toggles settings panel |
-| `click` | `#settings-close` | Closes settings panel |
-| `click` | `.theme-option` | Updates `theme` preference |
-| `click` | `.density-options button` | Updates `density` preference |
-| `click` | `.color-swatch` | Updates `backgroundColor` preference |
-| `input` | `#background-color` | Updates `backgroundColor` preference (custom picker) |
-| `input` | `#font-size` | Updates `fontSize` preference |
-| `click` | `#reset-settings` | Resets all preferences to defaults |
-
----
-
-### `site.css` — Visual Design System
-
-#### CSS Custom Properties (Design Tokens)
-
-| Variable | Light Value | Dark Value | Purpose |
+| Token | Light Theme | Dark Theme (Default) | Role |
 |---|---|---|---|
-| `--ink` | `#17213b` | `#edf0ff` | Primary text color |
-| `--muted` | `#6d7690` | `#aeb6d1` | Secondary/subtle text |
-| `--line` | `#e7e9f2` | `#343a56` | Borders and dividers |
-| `--purple` | `#6d4aff` | `#a998ff` | Brand accent color |
-| `--purple-dark` | `#5436df` | `#8873f5` | Hover state of brand color |
-| `--mint` | `#dff9ee` | `#193d38` | Positive result background tint |
-| `--green` | `#15956d` | `#63d5a9` | Positive sentiment text |
-| `--coral` | `#ff755f` | `#ff755f` | Negative accent |
-| `--yellow` | `#f7c95c` | `#f7c95c` | Sparkle/neutral accent |
-| `--surface` | `rgba(255,255,255,.86)` | `rgba(30,35,59,.9)` | Panel backgrounds (glassmorphism) |
-| `--page-background` | `#f7f8fc` | `#171b2d` | Full-page background (user-customizable) |
-| `--font-scale` | `1` | `1` | Multiplier for base font size |
+| `--bg-app` | `#f8fafc` (Cool Slate) | `#000000` (True Black) | Base canvas background |
+| `--bg-sidebar` | `#f1f5f9` | `#0a0a0a` (Deep Charcoal) | Left navigation sidebar surface |
+| `--bg-panel` | `#ffffff` | `#141414` (Neutral Dark) | Card & message surfaces |
+| `--bg-composer` | `#ffffff` | `#1a1a1a` (Dark Gray) | Bottom input container surface |
+| `--border-subtle` | `#e2e8f0` | `#222222` | Hairline dividers and outlines |
+| `--border-strong` | `#cbd5e1` | `#333333` | Input borders and card containers |
+| `--text-primary` | `#0f172a` (Slate 900) | `#ededed` (Off-white) | Primary headings and body text |
+| `--text-secondary` | `#475569` | `#a1a1a1` | Metadata, summaries, subtitles |
+| `--brand-gradient` | `#6366f1` → `#4f46e5` | `#ffffff` (Monochrome) | Primary button background |
+| `--brand-btn-text` | `#ffffff` | `#000000` (High-contrast) | Text/icon inside primary button |
+| `--pos-bar` | `#10b981` → `#059669` | `#34d399` → `#10b981` | Positive polarity meter gradient |
+| `--neg-bar` | `#f43f5e` → `#e11d48` | `#fb7185` → `#f43f5e` | Negative polarity meter gradient |
+| `--neu-bar` | `#f59e0b` → `#d97706` | `#fbbf24` → `#f59e0b` | Neutral polarity meter gradient |
 
 #### Responsive Breakpoints
 
-| Breakpoint | Behavior |
-|---|---|
-| `> 760px` | Side-by-side two-column workspace panels |
-| `≤ 760px` | Single-column stacked panels; trust row vertical |
-| `≤ 430px` | Smaller topbar, full-width analyze button, status pill hidden |
+- **Desktop (`> 860px`)**: Full sidebar, 3-column benchmark grid, keyboard shortcut display.
+- **Tablet (`680px – 860px`)**: Single-column benchmark cards, hidden keyboard shortcut hints.
+- **Mobile (`≤ 680px`)**: Sidebar transforms into a slide-out overlay drawer toggleable via header icon; feed and input dock adapt with full-width bubble wrapping.
 
 ---
 
