@@ -1,0 +1,352 @@
+SENTIMENT ANALYSIS SYSTEM - VIVA PREPARATION GUIDE
+====================================================
+
+1. PROJECT OVERVIEW
+-------------------
+
+Q1. What is the name of your project?
+A. The project is called Sentiment Analysis System, and the user-facing interface is branded as Sentiment Studio.
+
+Q2. What is the project about?
+A. It is a web application that accepts written customer feedback, analyzes its sentiment, and classifies it as Positive, Negative, or Neutral. The feedback and its calculated sentiment are also stored in a SQL Server database for future insights.
+
+Q3. What problem does the project solve?
+A. Organizations receive many reviews, comments, and customer messages. Reading every message manually is slow and subjective. This system provides a fast and consistent first-level analysis of the emotional tone of feedback.
+
+Q4. Who can use this system?
+A. Customer-support teams, product teams, business analysts, and managers can use it to quickly understand whether customer feedback is favorable, unfavorable, or mainly factual.
+
+Q5. What is the main objective?
+A. The objective is to build a simple end-to-end feedback intelligence system that combines a web interface, a backend API, sentiment classification, and persistent storage.
+
+Q6. What are the main features?
+A.
+- Accepts feedback through a browser form.
+- Limits input to 2,000 characters in the frontend.
+- Classifies feedback as Positive, Negative, or Neutral.
+- Displays a result with an explanation and visual sentiment meter.
+- Stores the original feedback, result, and submission time.
+- Supports light, dark, and system themes.
+- Supports background color, font-size, and layout-density preferences.
+- Saves display preferences in browser localStorage.
+- Provides Swagger/OpenAPI support during development.
+- Redirects HTTP requests to HTTPS.
+
+
+2. TECHNOLOGY STACK
+--------------------
+
+Q7. Which programming language is used?
+A. C# is used for the backend, machine-learning service, API controller, database context, and data models. HTML, CSS, and JavaScript are used for the frontend.
+
+Q8. Which framework is used?
+A. The backend uses ASP.NET Core Web API on .NET 10. The project uses the Microsoft.NET.Sdk.Web SDK and targets net10.0.
+
+Q9. Which frontend technology is used?
+A. The frontend is a static client-side interface built with HTML, CSS, and vanilla JavaScript. No separate frontend framework such as React, Angular, or Vue is used.
+
+Q10. Which database technology is used?
+A. SQL Server is used through the Microsoft.EntityFrameworkCore.SqlServer provider. During local development, the connection string points to SQL Server LocalDB and a database named SentimentDb.
+
+Q11. Which ORM is used?
+A. Entity Framework Core is used as the ORM. It maps the C# Feedback entity to the Feedbacks table and handles asynchronous database operations.
+
+Q12. Which machine-learning library is used?
+A. ML.NET is used. The project references Microsoft.ML and Microsoft.ML.FastTree. The implemented trainer is SDCA logistic regression.
+
+Q13. What other important packages are used?
+A.
+- Microsoft.EntityFrameworkCore.SqlServer: connects EF Core to SQL Server.
+- Microsoft.EntityFrameworkCore.Tools: supports EF Core development and migrations.
+- Microsoft.ML: provides the ML.NET pipeline and prediction APIs.
+- Microsoft.ML.FastTree: provides additional ML.NET trainers and related functionality.
+- Swashbuckle.AspNetCore: generates Swagger/OpenAPI documentation.
+
+Q14. Why was this technology stack selected?
+A. ASP.NET Core provides a high-performance web API and static-file hosting in one application. C# provides strong typing and good integration with .NET libraries. EF Core simplifies database access. ML.NET allows machine learning to run inside the .NET application without requiring a separate Python service. HTML, CSS, and JavaScript keep the frontend lightweight and easy to deploy.
+
+
+3. APPLICATION ARCHITECTURE
+----------------------------
+
+Q15. Explain the architecture of the system.
+A. The application follows a simple layered architecture:
+
+1. Presentation layer: index.html, site.css, and app.js provide the browser interface.
+2. API layer: FeedbackController exposes the REST endpoint.
+3. Service layer: SentimentAnalysisService performs sentiment analysis.
+4. Data layer: FeedbackContext uses EF Core to save feedback to SQL Server.
+5. Model layer: request, response, database, training-data, and prediction classes define the application data structures.
+
+Q16. Is this a monolithic or microservices application?
+A. It is a small monolithic ASP.NET Core application. The frontend, API, ML service, and database access are organized in one project. This is appropriate for the current scope because it reduces deployment and communication complexity.
+
+Q17. What happens when the user submits feedback?
+A.
+1. The user enters text in the browser form.
+2. app.js prevents the normal form submission.
+3. JavaScript sends a POST request to /api/Feedback/analyze.
+4. The controller validates that the request and FeedbackText are not empty.
+5. SentimentAnalysisService analyzes the text.
+6. A Feedback entity is created with the text, sentiment, and UTC submission time.
+7. EF Core saves the entity to SQL Server.
+8. The controller returns a JSON response containing the sentiment.
+9. JavaScript updates the result panel without reloading the page.
+
+Q18. What is the API endpoint?
+A. The endpoint is:
+POST /api/Feedback/analyze
+
+Example request:
+{"feedbackText":"The product is excellent and easy to use"}
+
+Example response:
+{"sentiment":"Positive"}
+
+Q19. What happens for invalid input?
+A. If the request is null or FeedbackText is empty or contains only whitespace, the API returns HTTP 400 Bad Request with the message "FeedbackText Cannot be empty".
+
+Q20. Why is asynchronous programming used?
+A. The database save uses SaveChangesAsync so the server does not block a request thread while waiting for the database operation. This improves scalability and responsiveness under concurrent requests.
+
+Q21. How are services registered?
+A. FeedbackContext is registered with dependency injection using AddDbContext and SQL Server. SentimentAnalysisService is registered as a singleton because it trains the model once and reuses the prediction engine. Controllers are registered with AddControllers.
+
+Q22. Why is the sentiment service a singleton?
+A. Model training is relatively expensive compared with making a prediction. A singleton prevents the application from rebuilding the model for every request. It creates the model during service construction and reuses the prediction engine.
+
+
+4. FRONTEND
+-----------
+
+Q23. How was the frontend created?
+A. The frontend was created using semantic HTML, custom CSS, and vanilla JavaScript. It is hosted from the application's wwwroot folder by ASP.NET Core static-file middleware.
+
+Q24. What is the role of index.html?
+A. It defines the page structure, feedback form, character counter, settings panel, result panel, accessibility labels, and script/style references.
+
+Q25. What is the role of site.css?
+A. site.css controls the visual design, responsive layout, colors, typography, panels, buttons, result states, themes, and density settings. It uses CSS custom properties such as --page-background and --font-scale.
+
+Q26. What is the role of app.js?
+A. app.js handles form submission, API communication, result rendering, error display, character counting, reset behavior, settings interactions, and localStorage persistence.
+
+Q27. How does the frontend communicate with the backend?
+A. It uses the browser Fetch API. A JSON POST request is sent to /api/Feedback/analyze with the property feedbackText. The returned JSON sentiment is used to update the result section.
+
+Q28. Why does the page not reload after analysis?
+A. The submit event is intercepted with preventDefault(). JavaScript calls the API asynchronously and updates only the result panel. This gives a smoother single-page user experience.
+
+Q29. How are themes implemented?
+A. JavaScript sets data-theme on the body element. CSS uses selectors such as body[data-theme="dark"] and CSS variables to change colors. The system theme uses the prefers-color-scheme media query.
+
+Q30. Where are display preferences stored?
+A. Theme, background color, font size, and layout density are serialized as JSON and stored in localStorage under the key sentiment-studio-preferences. These preferences are local to the browser and are not stored in the database.
+
+Q31. What accessibility features are present?
+A. The page uses labels, aria-label attributes, aria-live for result updates, role="alert" for errors, hidden descriptive labels, keyboard-friendly buttons, and a responsive layout. The result area can be announced when it changes.
+
+
+5. DATABASE AND ENTITY FRAMEWORK CORE
+--------------------------------------
+
+Q32. What table is used?
+A. The migration creates a table named Feedbacks.
+
+Q33. What columns does Feedbacks contain?
+A.
+- id: integer identity primary key.
+- FeedbackText: nvarchar(max), stores the submitted feedback.
+- Sentiment: nvarchar(max), stores Positive, Negative, or Neutral.
+- DateSubmitted: datetime2, stores the UTC submission time.
+
+Q34. What is the purpose of FeedbackContext?
+A. FeedbackContext inherits from DbContext and exposes DbSet<Feedback> Feedbacks. It represents the database session and provides EF Core access to the Feedbacks table.
+
+Q35. What is a migration?
+A. An EF Core migration is a versioned description of a database schema change. The InitialCreate migration creates the Feedbacks table and its primary key. Migrations make database changes repeatable and maintainable.
+
+Q36. Why is DateTime.UtcNow used?
+A. UTC avoids dependence on the server's local time zone. It gives a consistent timestamp even when the application is deployed to another region.
+
+Q37. How is the database configured?
+A. Program.cs reads the SentimentDb connection string from configuration and passes it to UseSqlServer. The current development connection uses SQL Server LocalDB:
+Server=(localdb)\\MSSQLLocalDB;Database=SentimentDb;Trusted_Connection=true;TrustServerCertificate=true
+
+Q38. How could the database be improved for production?
+A. A production system should use a managed SQL Server instance, store the connection string in a secret store or environment variable, add indexes where needed, use appropriate string lengths, add retention policies, and apply migrations through a controlled deployment process.
+
+
+6. MACHINE LEARNING AND SENTIMENT LOGIC
+----------------------------------------
+
+Q39. Which ML model is used?
+A. The ML.NET pipeline uses text featurization followed by a binary SDCA logistic-regression classifier. The classifier predicts a Boolean sentiment label and produces a numeric Score.
+
+Q40. Why was logistic regression selected?
+A. Logistic regression is a strong baseline for binary text classification. It is relatively fast, interpretable, lightweight, and works well when text is converted into numerical features such as word and n-gram representations. It is suitable for a small demonstration dataset and local inference.
+
+Q41. What does SDCA mean?
+A. SDCA means Stochastic Dual Coordinate Ascent. It is an optimization method used by ML.NET's logistic-regression trainer to learn model parameters efficiently.
+
+Q42. How is the text converted into model features?
+A. FeaturizeText converts the input text into a numerical feature vector. The model can then process textual patterns instead of raw strings.
+
+Q43. What dataset is used?
+A. The project uses Data/sentiment-labelled-sentences.tsv. It is a tab-separated file with a text column and a sentiment column. The sentiment labels are Boolean: 1 represents the positive class and 0 represents the negative class.
+
+Q44. How is the dataset loaded?
+A. MLContext.Data.LoadFromTextFile loads the TSV file with a header and a tab separator. SentimentData maps column 0 to Text and column 1 to the Boolean Sentiment property.
+
+Q45. When is the model trained?
+A. The model is trained when SentimentAnalysisService is constructed. The training data is loaded, the pipeline is fitted, and a PredictionEngine is created. Because the service is singleton, this initialization is reused for subsequent requests.
+
+Q46. What is the prediction output?
+A. SentimentPrediction contains a Boolean Prediction property mapped to PredictedLabel and a float Score. The application uses the Score to decide whether the ML result is positive, negative, or uncertain.
+
+Q47. Is the application purely ML-based?
+A. No. It uses a hybrid approach. First, it checks a curated positive/negative word list and handles simple negation. If there is no lexical result, it detects factual language. If those rules do not decide the result, it falls back to the ML.NET model.
+
+Q48. How does the lexical rule work?
+A. The input is tokenized with a regular expression. Words in the positive list add 1 to the score, while words in the negative list subtract 1. If a sentiment word is immediately preceded by a negation word such as "not" or "never", its score is reversed.
+
+Q49. How is neutral sentiment detected?
+A. The service returns Neutral when factual language is detected, or when the ML prediction score has a low absolute value, specifically below 0.15. This represents an uncertain or weak emotional signal.
+
+Q50. Why combine rules with machine learning?
+A. Rules provide predictable handling for common sentiment words and simple negation. Machine learning can generalize beyond the manually listed words. Combining them gives fast, explainable handling for obvious cases while retaining ML-based fallback behavior.
+
+Q51. What are the limitations of this model?
+A.
+- The dataset is small and may not represent every domain.
+- Boolean labels only provide two training classes; Neutral is added by application rules.
+- Simple word-based negation does not understand complex grammar.
+- Sarcasm, idioms, mixed opinions, and context may be misclassified.
+- The score is not a calibrated probability.
+- PredictionEngine is convenient for a small application but a production system may use a more scalable prediction approach.
+
+Q52. How could the ML part be improved?
+A.
+- Use a larger, domain-specific, reviewed dataset.
+- Split data into training and test sets.
+- Measure accuracy, precision, recall, F1-score, and a confusion matrix.
+- Add a true neutral class to the training data.
+- Compare logistic regression with other suitable text classifiers.
+- Normalize text more carefully and support multilingual input.
+- Version and monitor the model.
+- Retrain when real user feedback shows systematic errors.
+
+
+7. SECURITY, RELIABILITY, AND QUALITY
+--------------------------------------
+
+Q53. What security features are present?
+A. HTTPS redirection is enabled. ASP.NET Core model binding is used for JSON input. The frontend limits the text length to 2,000 characters, and the API rejects empty input. Database access uses EF Core parameters rather than string-concatenated SQL.
+
+Q54. What security improvements would be needed for production?
+A. Add authentication and authorization if feedback should be restricted, validate length server-side as well as client-side, configure strict CORS only when required, use secrets outside source control, add rate limiting, protect logs from sensitive feedback, add anti-abuse controls, and enable security headers.
+
+Q55. Is client-side validation enough?
+A. No. Client-side validation improves user experience, but it can be bypassed. The server must repeat important validation, including maximum length and allowed input rules.
+
+Q56. How are errors handled?
+A. The frontend checks response.ok, displays the server message when available, and shows a user-friendly error state. The API returns BadRequest for empty input. A production version should also add centralized exception handling and structured server-side logging.
+
+Q57. How is the application tested?
+A. The API can be tested using Swagger in development, the .http request file, browser interaction, and direct POST requests. Important test cases include positive, negative, neutral, empty, whitespace-only, long, factual, and negated feedback.
+
+Q58. What test cases would you demonstrate in a viva?
+A.
+- "I love this product" -> Positive.
+- "This is terrible and broken" -> Negative.
+- "The order arrived today" -> Neutral because it contains factual language.
+- "This is not good" -> Negative because negation reverses the positive word.
+- Empty input -> HTTP 400 Bad Request.
+- A valid request -> HTTP 200 OK and a JSON sentiment response.
+- Database check -> a Feedbacks record is created with UTC timestamp.
+
+Q59. What performance considerations exist?
+A. The model is trained once through the singleton service, avoiding repeated training. Database saving is asynchronous. The frontend uses an asynchronous fetch request and does not reload the page. For higher traffic, model serving, connection pooling, rate limiting, and more scalable prediction APIs should be evaluated.
+
+
+8. RUNNING AND DEPLOYMENT
+--------------------------
+
+Q60. How do you run the project locally?
+A.
+1. Open the solution in Visual Studio.
+2. Ensure the .NET 10 SDK/runtime is installed.
+3. Ensure SQL Server LocalDB is available.
+4. Restore NuGet packages.
+5. Apply the EF Core migration if the database has not been created.
+6. Run the ASP.NET Core project.
+7. Open the displayed HTTPS URL in a browser.
+8. Enter feedback and submit it.
+
+Q61. What happens when the application starts?
+A. ASP.NET Core builds the service container, configures EF Core, registers the sentiment singleton, enables controllers and Swagger, enables HTTPS redirection and static files, maps controller routes, and starts listening for requests. The sentiment service trains its model when it is first constructed.
+
+Q62. How is the frontend hosted?
+A. UseDefaultFiles and UseStaticFiles serve index.html and assets from wwwroot. The backend and frontend are therefore hosted by the same ASP.NET Core application.
+
+Q63. How would you deploy it?
+A. Publish the ASP.NET Core application, deploy the published files to a Windows or Linux host, configure a production SQL Server connection string through environment configuration or a secret store, apply migrations in a controlled way, terminate HTTPS correctly, and monitor logs and health.
+
+Q64. What configuration should not be hard-coded in production?
+A. Database connection strings, credentials, API keys, environment-specific URLs, and secret values should not be committed directly to source control. They should be supplied through environment variables, user secrets for development, or a managed secret store.
+
+
+9. COMMON DESIGN QUESTIONS
+---------------------------
+
+Q65. Why did you not use a separate frontend framework?
+A. The interface requirements are small and mostly form submission plus dynamic result rendering. Vanilla JavaScript avoids a build pipeline and extra dependencies while remaining sufficient for this scope.
+
+Q66. Why use an API instead of analyzing directly in JavaScript?
+A. The model and database should remain on the server. An API centralizes business logic, protects implementation details, supports multiple clients, and allows the model to be upgraded without changing the browser interface.
+
+Q67. Why store feedback after analysis?
+A. Persisting the feedback and result creates an audit trail and enables future reporting, trend analysis, model evaluation, and customer-service insights.
+
+Q68. Why return only the sentiment instead of the score?
+A. The current user experience is designed around a simple understandable label. The score is used internally for confidence-like thresholding. A future version could return a calibrated confidence value if it is explained correctly to users.
+
+Q69. What is dependency injection in this project?
+A. Dependency injection allows ASP.NET Core to create and provide FeedbackContext and SentimentAnalysisService to FeedbackController. The controller depends on abstractions managed by the framework rather than manually creating database and service objects.
+
+Q70. What is separation of concerns?
+A. The controller handles HTTP concerns, the sentiment service handles analysis, the DbContext handles persistence, models represent data, and the frontend handles presentation and user interaction. This makes the code easier to test and maintain.
+
+Q71. What would you change if the system grew significantly?
+A. I would separate the frontend and backend if needed, add authentication and authorization, use a production SQL Server service, introduce a repository or query layer only where useful, add automated tests and CI/CD, use a scalable model-serving approach, add monitoring, improve validation and rate limiting, and introduce pagination/reporting APIs for stored feedback.
+
+
+10. SHORT PRESENTATION SCRIPT
+------------------------------
+
+"Sentiment Analysis System is an ASP.NET Core .NET 10 web application that analyzes written customer feedback. The user enters feedback through a static HTML, CSS, and JavaScript frontend. JavaScript sends the text to the POST /api/Feedback/analyze endpoint. The ASP.NET Core controller validates the request and calls a singleton sentiment-analysis service. The service uses a hybrid approach: curated lexical rules and negation handling are applied first, factual language can produce a neutral result, and ML.NET is used as the fallback classifier. The ML pipeline uses text featurization and SDCA logistic regression trained from a TSV dataset. After classification, Entity Framework Core stores the feedback, sentiment, and UTC timestamp in a SQL Server LocalDB database. The API returns JSON, and the frontend displays the result without reloading the page. The design is intentionally simple, lightweight, and suitable for demonstrating a complete web, database, and machine-learning workflow."
+
+
+11. IMPORTANT FACTS TO REMEMBER
+--------------------------------
+
+- Target framework: .NET 10.
+- Backend: ASP.NET Core Web API.
+- Frontend: HTML, CSS, vanilla JavaScript.
+- ORM: Entity Framework Core.
+- Database: SQL Server LocalDB during local development.
+- Database name: SentimentDb.
+- Main table: Feedbacks.
+- ML library: ML.NET.
+- ML trainer: SDCA logistic regression.
+- Feature transformation: FeaturizeText.
+- Training data: Data/sentiment-labelled-sentences.tsv.
+- Training labels: Boolean positive/negative labels.
+- Application output: Positive, Negative, or Neutral.
+- API route: POST /api/Feedback/analyze.
+- Request property: feedbackText.
+- Persistence timestamp: DateTime.UtcNow.
+- API documentation: Swagger/OpenAPI in development.
+- Static files: hosted from wwwroot.
+- Client preferences: stored in localStorage.
+- Main limitation: small binary training dataset and rule-based neutral handling.
