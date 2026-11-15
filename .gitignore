@@ -54,3 +54,4 @@ Thumbs.db
 
 # Generated files
 GeneratedFiles/
+.agents/
